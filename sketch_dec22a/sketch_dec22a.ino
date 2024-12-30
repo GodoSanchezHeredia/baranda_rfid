@@ -2,27 +2,46 @@
 #include <MFRC522.h>
 
 // Pines RFID
-#define RST_PIN 9
-#define SS_PIN 10
+#define RST_PIN 36
+#define SS_PIN 38
 MFRC522 rfid(SS_PIN, RST_PIN);
+// laser tx - rx
+const int txlaser = 32;
+const int rxlaser = 34;
+
 
 // Pines Ultrasonido
-const int trigPin = 37;
-const int echoPin = 35;
+const int trigPin = 31;
+const int echoPin = 30;
+const int trigPin1 = 29;
+const int echoPin1 = 28;
 
 // Pines Limitadores (Pull-up)
-const int inputPin1 = 22;
-const int inputPin2 = 23;
+const int inputPin1 = 44;
+const int inputPin2 = 40;
 
 // Pines Motor
-const int dirPin1 = 4;
-const int dirPin2 = 5;
-const int pwmPin = 7;
-const int standbyPin = 6;
+const int dirPin1 = 9;
+const int dirPin2 = 10;
+const int pwmPin = 11;
+const int standbyPin = 8;
 
 // Pin LED
-const int ledPin = 31;
-const int led2pin = 30;
+
+const int Output1 = 21;
+const int Output2 = 12;
+const int Output3 = 20;
+const int Output4 = 13;
+const int Output5 = 22;
+
+// Pin input
+
+const int Input3 = 23;
+const int Input4 = 24;
+const int Input5 = 25;
+const int Input6 = 26;
+const int Input7 = 27;
+
 enum State { STOP, FORWARD, REVERSE };
  State currentState = STOP; 
 // Variables de estado
@@ -30,26 +49,43 @@ bool motorActive = false;
 unsigned long noDetectionStart = 0;
 const unsigned long noDetectionDelay = 10000; // 10 segundos
 void Contigencia(void);
+void SEMAFORO(void);
+
 bool ledState = LOW;  
 unsigned long previousMillis = 0; // Tiempo anterior
 
 void setup() {
   // Configuración de pines
+    Serial.begin(9600);
+
   pinMode(trigPin, OUTPUT);
   pinMode(echoPin, INPUT);
+  pinMode(trigPin1, OUTPUT);
+  pinMode(echoPin1, INPUT);
+
   pinMode(inputPin1, INPUT_PULLUP);
   pinMode(inputPin2, INPUT_PULLUP);
+
   pinMode(dirPin1, OUTPUT);
   pinMode(dirPin2, OUTPUT);
   pinMode(pwmPin, OUTPUT);
   pinMode(standbyPin, OUTPUT);
-  pinMode(ledPin, OUTPUT);
-    pinMode(led2pin, OUTPUT);
 
-  pinMode(26, INPUT_PULLUP); // Configurar el pin 26 como entrada con pull-up
-  pinMode(25, INPUT_PULLUP); // Configurar el pin 26 como entrada con pull-up
-  pinMode(27, INPUT_PULLUP); // Configurar el pin 26 como entrada con pull-up
-  pinMode(28, INPUT_PULLUP); // Configurar el pin 26 como entrada con pull-up
+  pinMode(Output1, OUTPUT);
+  pinMode(Output2, OUTPUT);
+  pinMode(Output3, OUTPUT);
+  pinMode(Output4, OUTPUT);
+  pinMode(Output5, OUTPUT);
+
+  pinMode(txlaser, OUTPUT);
+  pinMode(rxlaser, INPUT); // Configurar el pin 26 como entrada con pull-up
+
+
+  pinMode(Input3, INPUT_PULLUP); // Configurar el pin 26 como entrada con pull-up
+  pinMode(Input4, INPUT_PULLUP); // Configurar el pin 25 como entrada con pull-up
+  pinMode(Input5, INPUT_PULLUP); // Configurar el pin 27 como entrada con pull-up
+  pinMode(Input6, INPUT_PULLUP); // Configurar el pin 28 como entrada con pull-up
+  pinMode(Input7, INPUT_PULLUP); // Configurar el pin 28 como entrada con pull-up
 
   // Configuración de RFID
   SPI.begin();
@@ -57,7 +93,12 @@ void setup() {
 
   // Inicialización
   digitalWrite(standbyPin, HIGH); // Activar motor standby
-  digitalWrite(ledPin, LOW);      // LED apagado
+  digitalWrite(Output1, LOW);      // LED apagado
+  digitalWrite(Output2, LOW);      // LED apagado
+  digitalWrite(Output3, LOW);      // LED apagado
+  digitalWrite(Output4, LOW);      // LED apagado
+  digitalWrite(Output5, LOW);      // LED apagado
+
 }
 
 void loop() {
@@ -73,14 +114,16 @@ void loop() {
     while (true) {
 
   Contigencia();
-  digitalWrite(ledPin,LOW);
-  digitalWrite(led2pin, HIGH);
+  SEMAFORO();
+  digitalWrite(Output3,LOW);
+  digitalWrite(Output4, HIGH);
 
       // Verificar si el ultrasonido detecta un objeto
       if (ultrasonicDetectObject()) {
         isObjectDetected = true;
         inReverse = false;
-         digitalWrite(led2pin, HIGH);
+        digitalWrite(Output4, HIGH);
+        digitalWrite(txlaser, HIGH);
 
 
         // Activar o detener el motor según el estado de inputPin2
@@ -100,31 +143,32 @@ void loop() {
           if (!inReverse) {
             reverseMotor();
             inReverse = true;
+            Serial.print("modo reversa");
           }
 
           // Si inputPin1 está activo, detener el motor y salir del bucle
           if (digitalRead(inputPin1) != 0) {
             stopMotor();
-            return; // Salir y esperar un nuevo RFID
+           return; // Salir y esperar un nuevo RFID
           }
         }
       }
 
       // Si el sistema está en reversa, seguir revisando el estado del botón de emergencia
       if (inReverse) {
-          digitalWrite(led2pin, HIGH);
-
-        if (digitalRead(26) == LOW || digitalRead(25) == LOW) {
+          digitalWrite(Output4, HIGH);
+      SEMAFORO();
+        if (digitalRead(Input3) == LOW || digitalRead(Input6) == LOW) {
           stopMotor();
               State currentState = STOP;            // Estado inicial
-    while (digitalRead(26) == LOW || digitalRead(25) == LOW) {
-  digitalWrite(ledPin,HIGH);
+    while (digitalRead(Input3) == LOW || digitalRead(Input6) == LOW) {
+  digitalWrite(Output3,HIGH);
 
-      if (digitalRead(25) == LOW) {
+      if (digitalRead(Input6) == LOW) {
                   blinkLED();
-         if (digitalRead(27) == LOW) {
+         if (digitalRead(Input5) == LOW) {
         currentState = FORWARD;
-      } else if (digitalRead(28) == LOW) {
+      } else if (digitalRead(Input7) == LOW) {
         currentState = REVERSE;
       } else {
         currentState = STOP;
@@ -155,8 +199,8 @@ void loop() {
 
 
       delay(100); // Esperar hasta que se suelte el botón
-    }  digitalWrite(ledPin, HIGH);
-
+    }  digitalWrite(Output3, HIGH);
+    
           // Continuar con el reversa después de que el botón de emergencia se haya liberado
           reverseMotor();
         }
@@ -164,22 +208,35 @@ void loop() {
     }
     
   }
-    digitalWrite(led2pin, LOW);
+    digitalWrite(Output4, LOW);
+    digitalWrite(Output1, LOW);
+    digitalWrite(Output2, LOW);
+    digitalWrite(txlaser,LOW);
 
 }
+void SEMAFORO(void){
+if(!digitalRead(rxlaser)){
+    digitalWrite(Output1, HIGH);
+    digitalWrite(Output2, LOW);
 
+}else{
+    digitalWrite(Output1, LOW);
+    digitalWrite(Output2, HIGH);
+
+}
+}
 void Contigencia(void){
-  if (digitalRead(26) == LOW || digitalRead(25) == LOW) {
+  if (digitalRead(Input3) == LOW || digitalRead(Input6) == LOW) {
       stopMotor();
       State currentState = STOP;            // Estado inicial
-      while (digitalRead(26) == LOW || digitalRead(25) == LOW) {
-          digitalWrite(ledPin,HIGH);
-        if (digitalRead(25) == LOW) {
-          digitalWrite(ledPin,LOW);
+      while (digitalRead(Input3) == LOW || digitalRead(Input6) == LOW) {
+          digitalWrite(Output3,HIGH);
+        if (digitalRead(Input6) == LOW) {
+          digitalWrite(Output3,LOW);
           blinkLED();
-          if (digitalRead(27) == LOW) {
+          if (digitalRead(Input5) == LOW) {
             currentState = FORWARD;
-          } else if (digitalRead(28) == LOW) {
+          } else if (digitalRead(Input7) == LOW) {
             currentState = REVERSE;
           } else {
             currentState = STOP;
@@ -225,14 +282,20 @@ bool ultrasonicDetectObject() {
 
   long duration = pulseIn(echoPin, HIGH);
   float distance = duration * 0.034 / 2; // Distancia en cm
-
+   // Serial.print("Distancia: ");
+  //Serial.print(distance);
+ // Serial.println(" cm");
   return (distance < 10);
 }
 
 void blinkLED() {
-  digitalWrite(ledPin, HIGH);
+  digitalWrite(Output3, HIGH);
+    digitalWrite(Output5, HIGH);
+
   delay(100);
-  digitalWrite(ledPin, LOW);
+  digitalWrite(Output3, LOW);
+    digitalWrite(Output5, LOW);
+
   delay(100);
 }
 /* 
@@ -244,14 +307,14 @@ void blinkLED(unsigned long interval) {
 
     // Cambiar el estado del LED
     ledState = !ledState;
-    digitalWrite(led2pin, ledState);
+    digitalWrite(Output4, ledState);
   }
 }*/
 
 void activateMotor() {
   digitalWrite(dirPin1, HIGH);
   digitalWrite(dirPin2, LOW);
-  analogWrite(pwmPin, 250); // Velocidad máxima
+  analogWrite(pwmPin, 150); // Velocidad máxima
   motorActive = true;
 }
 
@@ -263,7 +326,7 @@ void stopMotor() {
 void reverseMotor() {
   digitalWrite(dirPin1, LOW);
   digitalWrite(dirPin2, HIGH);
-  analogWrite(pwmPin, 255); // Velocidad máxima
+  analogWrite(pwmPin, 150); // Velocidad máxima
 }
 
 bool waitForNoDetection() {
