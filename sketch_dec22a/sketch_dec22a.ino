@@ -21,7 +21,8 @@ const int pwmPin = 7;
 const int standbyPin = 6;
 
 // Pin LED
-const int ledPin = 33;
+const int ledPin = 31;
+const int led2pin = 30;
 enum State { STOP, FORWARD, REVERSE };
  State currentState = STOP; 
 // Variables de estado
@@ -29,6 +30,8 @@ bool motorActive = false;
 unsigned long noDetectionStart = 0;
 const unsigned long noDetectionDelay = 10000; // 10 segundos
 void Contigencia(void);
+bool ledState = LOW;  
+unsigned long previousMillis = 0; // Tiempo anterior
 
 void setup() {
   // Configuración de pines
@@ -41,6 +44,8 @@ void setup() {
   pinMode(pwmPin, OUTPUT);
   pinMode(standbyPin, OUTPUT);
   pinMode(ledPin, OUTPUT);
+    pinMode(led2pin, OUTPUT);
+
   pinMode(26, INPUT_PULLUP); // Configurar el pin 26 como entrada con pull-up
   pinMode(25, INPUT_PULLUP); // Configurar el pin 26 como entrada con pull-up
   pinMode(27, INPUT_PULLUP); // Configurar el pin 26 como entrada con pull-up
@@ -57,48 +62,7 @@ void setup() {
 
 void loop() {
   // Verificar el estado del botón de emergencia
-  if (digitalRead(26) == LOW || digitalRead(25) == LOW) {
-    stopMotor();
-    State currentState = STOP;            // Estado inicial
-    while (digitalRead(26) == LOW || digitalRead(25) == LOW) {
-      if (digitalRead(25) == LOW) {
-         if (digitalRead(27) == LOW) {
-          currentState = FORWARD;
-        } else if (digitalRead(28) == LOW) {
-          currentState = REVERSE;
-        } else {
-          currentState = STOP;
-      }
-      blinkLED();
-      switch (currentState) {
-        case FORWARD:
-        if (digitalRead(inputPin2) == 0){
-          activateMotor();
-        }else{
-          stopMotor(); 
-        }
-          break;
-        case REVERSE:
-        if (digitalRead(inputPin1) == 0){
-          reverseMotor();
-        }else{
-          stopMotor(); 
-        }
-          
-          break;
-        case STOP:
-        default:
-          stopMotor();
-          break;
-      }
-
-      }
-
-
-      delay(100); // Esperar hasta que se suelte el botón
-    }
-    // Regresar al principio del loop, esperando un nuevo RFID
-  }
+  Contigencia();
 
   // Continuar con el flujo normal si se detecta un RFID
   if (rfid.PICC_IsNewCardPresent() && rfid.PICC_ReadCardSerial()) {
@@ -108,54 +72,16 @@ void loop() {
 
     while (true) {
 
-    if (digitalRead(26) == LOW || digitalRead(25) == LOW) {
-    stopMotor();
-    State currentState = STOP;            // Estado inicial
-    while (digitalRead(26) == LOW || digitalRead(25) == LOW) {
-
-      if (digitalRead(25) == LOW) {
-         if (digitalRead(27) == LOW) {
-        currentState = FORWARD;
-      } else if (digitalRead(28) == LOW) {
-        currentState = REVERSE;
-      } else {
-        currentState = STOP;
-      }
-      switch (currentState) {
-        case FORWARD:
-        if (digitalRead(inputPin2) == 0){
-          activateMotor();
-        }else{
-          stopMotor(); 
-        }
-          break;
-        case REVERSE:
-        if (digitalRead(inputPin1) == 0){
-          reverseMotor();
-        }else{
-          stopMotor(); 
-        }
-          
-          break;
-        case STOP:
-        default:
-          stopMotor();
-          break;
-      }
-
-      }
-
-
-      delay(100); // Esperar hasta que se suelte el botón
-    }
-    // Regresar al principio del loop, esperando un nuevo RFID
-  }
+  Contigencia();
+  digitalWrite(ledPin,LOW);
+  digitalWrite(led2pin, HIGH);
 
       // Verificar si el ultrasonido detecta un objeto
       if (ultrasonicDetectObject()) {
         isObjectDetected = true;
         inReverse = false;
-        blinkLED();
+         digitalWrite(led2pin, HIGH);
+
 
         // Activar o detener el motor según el estado de inputPin2
         if (digitalRead(inputPin2) != 0) {
@@ -186,12 +112,16 @@ void loop() {
 
       // Si el sistema está en reversa, seguir revisando el estado del botón de emergencia
       if (inReverse) {
+          digitalWrite(led2pin, HIGH);
+
         if (digitalRead(26) == LOW || digitalRead(25) == LOW) {
           stopMotor();
               State currentState = STOP;            // Estado inicial
     while (digitalRead(26) == LOW || digitalRead(25) == LOW) {
+  digitalWrite(ledPin,HIGH);
 
       if (digitalRead(25) == LOW) {
+                  blinkLED();
          if (digitalRead(27) == LOW) {
         currentState = FORWARD;
       } else if (digitalRead(28) == LOW) {
@@ -225,19 +155,66 @@ void loop() {
 
 
       delay(100); // Esperar hasta que se suelte el botón
-    }
+    }  digitalWrite(ledPin, HIGH);
+
           // Continuar con el reversa después de que el botón de emergencia se haya liberado
           reverseMotor();
         }
       }
     }
+    
   }
+    digitalWrite(led2pin, LOW);
+
 }
 
 void Contigencia(void){
+  if (digitalRead(26) == LOW || digitalRead(25) == LOW) {
+      stopMotor();
+      State currentState = STOP;            // Estado inicial
+      while (digitalRead(26) == LOW || digitalRead(25) == LOW) {
+          digitalWrite(ledPin,HIGH);
+        if (digitalRead(25) == LOW) {
+          digitalWrite(ledPin,LOW);
+          blinkLED();
+          if (digitalRead(27) == LOW) {
+            currentState = FORWARD;
+          } else if (digitalRead(28) == LOW) {
+            currentState = REVERSE;
+          } else {
+            currentState = STOP;
+        }
+        switch (currentState) {
+          case FORWARD:
+          if (digitalRead(inputPin2) == 0){
+            activateMotor();
+          }else{
+            stopMotor(); 
+          }
+            break;
+          case REVERSE:
+          if (digitalRead(inputPin1) == 0){
+            reverseMotor();
+          }else{
+            stopMotor(); 
+          }
+            
+            break;
+          case STOP:
+          default:
+            stopMotor();
+            break;
+        }
+
+        }
 
 
-  
+        delay(100); // Esperar hasta que se suelte el botón
+      }
+      // Regresar al principio del loop, esperando un nuevo RFID
+    }
+
+
 }
 bool ultrasonicDetectObject() {
   digitalWrite(trigPin, LOW);
@@ -251,13 +228,25 @@ bool ultrasonicDetectObject() {
 
   return (distance < 10);
 }
- 
+
 void blinkLED() {
   digitalWrite(ledPin, HIGH);
-  delay(200);
+  delay(100);
   digitalWrite(ledPin, LOW);
-  delay(200);
+  delay(100);
 }
+/* 
+void blinkLED(unsigned long interval) {
+  unsigned long currentMillis = millis(); // Obtener el tiempo actual
+
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis; // Actualizar el tiempo anterior
+
+    // Cambiar el estado del LED
+    ledState = !ledState;
+    digitalWrite(led2pin, ledState);
+  }
+}*/
 
 void activateMotor() {
   digitalWrite(dirPin1, HIGH);
